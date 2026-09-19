@@ -1,12 +1,15 @@
+import sys
 import json
 from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from campusconnect import windows_settings as settings
+if sys.platform == 'win32':
+    from campusconnect import windows_settings as settings
 
 
+@unittest.skipUnless(sys.platform == 'win32', 'Windows DPAPI and registry tests')
 class SettingsTests(unittest.TestCase):
     def test_encrypted_persistence_and_forgetting(self):
         password = 'example +&中文 password '
@@ -19,12 +22,15 @@ class SettingsTests(unittest.TestCase):
             settings.save_preferences(path, {'remember': False, 'auto_connect': False}, password)
             self.assertNotIn('password_dpapi', path.read_text())
 
-    def test_auto_connect_requires_password_storage(self):
+    def test_preferences_save_without_credentials(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'preferences.json'
-            with self.assertRaises(ValueError):
-                settings.save_preferences(path, {'remember': False, 'auto_connect': True}, 'pw')
-            self.assertFalse(path.exists())
+            for remember in (False, True):
+                settings.save_preferences(path, {'remember': remember, 'auto_connect': True}, '')
+                saved = json.loads(path.read_text())
+                self.assertTrue(saved['auto_connect'])
+                self.assertEqual(saved['remember'], remember)
+                self.assertNotIn('password_dpapi', saved)
 
     def test_startup_command_and_registry_scope(self):
         with patch.object(settings.sys, 'frozen', True, create=True), \

@@ -11,7 +11,10 @@ import ipaddress
 import logging
 import builtins
 import os
-import msvcrt
+if os.name == 'nt':
+    import msvcrt
+else:
+    import fcntl
 from logging.handlers import TimedRotatingFileHandler
 
 import requests
@@ -30,7 +33,7 @@ def print(*args, **kwargs):
 
 
 class OperationLock:
-    """Windows 文件锁在进程退出时自动释放，锁文件保留不代表仍被占用。"""
+    """系统文件锁在进程退出时自动释放，锁文件保留不代表仍被占用。"""
     def __init__(self, path):
         self.path = path
         self.handle = None
@@ -43,7 +46,10 @@ class OperationLock:
             self.handle.flush()
         self.handle.seek(0)
         try:
-            msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+            if os.name == 'nt':
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:
             self.handle.close()
             self.handle = None
@@ -53,7 +59,10 @@ class OperationLock:
     def __exit__(self, *args):
         if self.handle:
             self.handle.seek(0)
-            msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+            if os.name == 'nt':
+                msvcrt.locking(self.handle.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
             self.handle.close()
 
 
@@ -140,7 +149,7 @@ def cycle(session, login_url, permit_login, force_login=False, verify_internet=T
         if not verify_internet:
             print(f'[检查结果] 认证在线={online}；未检测外网')
             if online is True:
-                print('已确认认证在线；未验证外网可用性。')
+                print('已确认认证在线。')
                 return True
         internet = connected(session) if verify_internet else False
         if verify_internet:
@@ -180,7 +189,7 @@ def cycle(session, login_url, permit_login, force_login=False, verify_internet=T
         online, _ = status(session, login_url)
         if not verify_internet:
             if online is True:
-                print('登录后已确认认证在线；未验证外网可用性。')
+                print('登录后已确认认证在线。')
                 return True
             continue
         internet = connected(session)

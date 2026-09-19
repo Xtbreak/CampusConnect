@@ -1,9 +1,10 @@
 import queue
 import tempfile
 import time
+import threading
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from campusconnect import core
 from campusconnect import connection_worker as worker
@@ -19,7 +20,91 @@ def blocked_worker(credentials, auto, data_dir, events, stop):
         worker.run_connections(credentials, auto, data_dir, events, stop)
 
 
+def online_worker(credentials, auto, data_dir, events, stop):
+    with patch.object(core, 'cycle', return_value=True), \
+         patch.object(core, 'connected', return_value=True):
+        worker.run_connections(credentials, auto, data_dir, events, stop)
+
+
 class CancellationTests(unittest.TestCase):
+    def test_disable_auto_reaches_running_child_without_termination(self):
+        with tempfile.TemporaryDirectory() as folder:
+            task = worker.ConnectionTask()
+            try:
+                with patch.object(worker, 'run_connections', online_worker):
+                    task.start(('test', 'test', '电信'), True, folder)
+                deadline = time.monotonic() + 10
+                while True:
+                    kind, value = task.events.get(timeout=max(0.01, deadline - time.monotonic()))
+                    if kind == 'state':
+                        self.assertIn('自动检查中', value)
+                        break
+                task.set_auto(False)
+                task.process.join(timeout=3)
+                self.assertEqual(task.process.exitcode, 0)
+                self.assertFalse(task.stopping)
+                self.assertFalse(task.stop_event.is_set())
+            finally:
+                task.stop()
+                if task.process is not None:
+                    task.process.join(timeout=2)
+                task.dispose()
+
+    def test_saved_auto_setting_can_cancel_long_monitor_wait(self):
+        auto = threading.Event()
+        auto.set()
+        stop = threading.Event()
+        finished = threading.Event()
+        results = []
+        def wait():
+            results.append(worker.wait_for_next_check(stop, auto, 1800))
+            finished.set()
+        thread = threading.Thread(target=wait, daemon=True)
+        thread.start()
+        auto.clear()
+        try:
+            self.assertTrue(finished.wait(2))
+            self.assertEqual(results, [False])
+            self.assertFalse(stop.is_set())
+        finally:
+            stop.set()
+            thread.join(timeout=2)
+
+    def test_desktop_status_follows_actual_internet_probe(self):
+        for authenticated, internet in [(True, True), (True, False), (False, True), (False, False)]:
+            with self.subTest(authenticated=authenticated, internet=internet), \
+                 tempfile.TemporaryDirectory() as folder, \
+                 patch.object(core, 'cycle', return_value=authenticated) as cycle, \
+                 patch.object(core, 'connected', return_value=internet) as probe:
+                events = queue.Queue()
+                stop = MagicMock()
+                stop.is_set.return_value = False
+                worker.run_connections(('test', 'test', '电信'), False, folder, events, stop)
+                messages = []
+                while not events.empty():
+                    kind, value = events.get_nowait()
+                    if kind == 'state':
+                        messages.append(value)
+                probe.assert_called_once()
+                self.assertFalse(cycle.call_args.kwargs['verify_internet'])
+                self.assertEqual(len(messages), 1)
+                if internet:
+                    self.assertEqual(messages[0], '网络已连接。')
+                else:
+                    self.assertIn('外网检测失败', messages[0])
+                    self.assertIn('校园网已认证' if authenticated else '认证也未确认', messages[0])
+                self.assertNotIn('未检测外网', messages[0])
+
+    def test_second_connection_cannot_acquire_live_lock(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'AutoConnect.lock'
+            with core.OperationLock(path):
+                with self.assertRaises(RuntimeError):
+                    with core.OperationLock(path):
+                        self.fail('A second task acquired the active lock')
+            with core.OperationLock(path):
+                pass
+
     def test_stop_interrupts_blocked_work_and_releases_lock_for_restart(self):
         with tempfile.TemporaryDirectory() as folder:
             task = worker.ConnectionTask()

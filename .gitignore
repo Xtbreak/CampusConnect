@@ -22,3 +22,5 @@ htmlcov/
 *.egg-info/
 *.exe
 *.zip
+*.dmg
+.DS_Store

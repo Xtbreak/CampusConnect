@@ -71,11 +71,7 @@ def startup_enabled():
 
 def save_preferences(path, settings, password):
     payload = dict(settings)
-    if payload.get('auto_connect') and not payload.get('remember'):
-        raise ValueError('启动后自动连接需要勾选“记住密码”。')
-    if payload.get('remember'):
-        if not password:
-            raise ValueError('请先输入密码。')
+    if payload.get('remember') and password:
         payload['password_dpapi'] = protect(password)
     else:
         payload.pop('password_dpapi', None)

@@ -10,6 +10,8 @@
 | `campusconnect/connection_worker.py` | 独立网络进程、取消与重试 |
 | `campusconnect/portal.py` | 运营商及登录参数构造 |
 | `campusconnect/windows_settings.py` | 密码加密、本地设置、开机启动 |
+| `campusconnect/platform_settings.py` | 平台选择、数据目录、打开文件夹 |
+| `campusconnect/mac_settings.py` | macOS 钥匙串、本地设置、登录启动 |
 | `campusconnect/tray.py` | 托盘及菜单 |
 | `campusconnect/paths.py` | 源码与 EXE 资源路径 |
 | `campusconnect/diagnostics.py` | 脱敏请求诊断 |
@@ -22,7 +24,9 @@ python -m campusconnect.core --help
 powershell -ExecutionPolicy Bypass -File scripts/build.ps1
 ```
 
-Windows 测试覆盖参数编码、认证流程、进程停止、密码保存、窗口行为及日志脱敏。测试不使用真实校园网账号登录。GUI 测试需要可用的 Windows 桌面环境。
+测试覆盖参数编码、认证流程、进程停止、密码保存、窗口行为及日志脱敏。平台专用测试在另一平台自动跳过；Mac 设置测试模拟钥匙串，避免操作开发者真实凭据和启动项。测试不使用真实校园网账号登录。GUI 测试需要可用的桌面环境。
+
+macOS 构建执行 `bash scripts/build_macos.sh`，详见 [macOS 使用与发布](macos.md)。GitHub Actions 分别构建 Windows、macOS arm64 和 macOS x86_64；标签发布只创建草稿，正式发布前需完成对应平台实际验收。
 
 构建使用 `.venv-build/`，图标转换由 `python -m scripts.prepare_icon` 完成。`scripts/launch.py` 为 EXE 入口；源码通过 `python -m campusconnect` 运行。构建产物写入 `build/` 和 `dist/`，不进入 Git。发布 EXE 应作为 Releases 附件，避免把每个版本的二进制提交到源码历史。
 

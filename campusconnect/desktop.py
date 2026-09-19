@@ -1,5 +1,5 @@
 from campusconnect.paths import asset_path
-"""无需命令行的 Windows 校园网客户端。"""
+"""Windows 与 macOS 校园网客户端。"""
 import json
 import logging
 import os
@@ -7,7 +7,6 @@ from pathlib import Path
 import queue
 import multiprocessing
 import sys
-import re
 import tkinter as tk
 from tkinter import ttk, messagebox
 from logging.handlers import TimedRotatingFileHandler
@@ -15,39 +14,11 @@ from logging.handlers import TimedRotatingFileHandler
 from campusconnect.connection_worker import ConnectionTask
 from campusconnect.core import VERSION
 from campusconnect.portal import OPERATORS, build_login_url
-from campusconnect.windows_settings import save_preferences, unprotect, set_startup, startup_enabled
+from campusconnect.platform_settings import (save_preferences, load_password, set_startup,
+    startup_enabled, data_directory, open_directory, IS_MAC, FONT_FAMILY)
 from campusconnect.tray import Tray
 
-DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'MyWatch'
-
-
-class QueueLog(logging.Handler):
-    def __init__(self, events):
-        super().__init__()
-        self.events = events
-        self.previous = None
-
-    def emit(self, record):
-        message = re.sub(r'^\[子进程 [^\]]+\]\s*', '', record.getMessage())
-        prefixes = ('程序启动', '设置已保存', '设置保存失败', '连接参数验证失败',
-                    '准备启动独立网络任务', '创建网络子进程失败',
-                    '发送登录请求', '登录接口', '登录请求未确认',
-                    '登录后已确认', '登录后仍未确认', '已确认认证在线',
-                    '认证状态：未知', '连接操作锁被占用', '网络任务异常',
-                    '下轮检查等待', '用户停止', '托盘不可用')
-        if not message.startswith(prefixes):
-            return
-        if message.startswith('下轮检查等待 60 秒'):
-            return
-        if message == self.previous:
-            return
-        self.previous = message
-        if message.startswith('程序启动'):
-            message = '校园网助手已启动。'
-        elif message.startswith('准备启动独立网络任务'):
-            message = '正在连接校园网……'
-        record = logging.makeLogRecord({**record.__dict__, 'msg': message, 'args': ()})
-        self.events.put(('log', self.format(record)))
+DATA = data_directory()
 
 
 class App:
@@ -59,7 +30,7 @@ class App:
         root.configure(background='#f3f6fb')
         style = ttk.Style(root)
         style.theme_use('clam')
-        style.configure('.', font=('Microsoft YaHei UI', 10))
+        style.configure('.', font=(FONT_FAMILY, 10))
         style.configure('TFrame', background='#f3f6fb')
         style.configure('TLabel', background='#f3f6fb', foreground='#172b4d')
         style.configure('Card.TFrame', background='white')
@@ -80,26 +51,27 @@ class App:
         self.password = tk.StringVar()
         self.operator = tk.StringVar()
         self.auto = tk.BooleanVar(value=True)
-        self.remember = tk.BooleanVar(value=False)
-        self.autostart = tk.BooleanVar(value=startup_enabled())
-        self.auto_connect = tk.BooleanVar(value=False)
+        self.remember = tk.BooleanVar(value=True)
+        self.autostart = tk.BooleanVar(value=True)
+        self.auto_connect = tk.BooleanVar(value=True)
         self.close_action = tk.StringVar(value='隐藏到托盘')
         self.saved_close_action = '隐藏到托盘'
         self.state = tk.StringVar(value='请填写校园网账号、密码并选择运营商。')
         try:
             settings = json.loads((DATA / 'preferences.json').read_text(encoding='utf-8'))
+            self.autostart.set(startup_enabled())
             self.account.set(settings.get('account', ''))
             if settings.get('operator') in OPERATORS:
                 self.operator.set(settings['operator'])
             self.auto.set(bool(settings.get('auto', True)))
-            self.remember.set(bool(settings.get('remember', False)))
-            self.auto_connect.set(bool(settings.get('auto_connect', False)))
+            self.remember.set(bool(settings.get('remember', True)))
+            self.auto_connect.set(bool(settings.get('auto_connect', True)))
             self.saved_close_action = settings.get('close_action', '隐藏到托盘')
             if self.saved_close_action not in ('隐藏到托盘', '彻底退出'):
                 self.saved_close_action = '隐藏到托盘'
             self.close_action.set(self.saved_close_action)
-            if self.remember.get() and settings.get('password_dpapi'):
-                self.password.set(unprotect(settings['password_dpapi']))
+            if self.remember.get():
+                self.password.set(load_password(settings))
         except FileNotFoundError:
             pass
         except (OSError, ValueError, AttributeError):
@@ -107,14 +79,17 @@ class App:
             self.state.set('未能读取设置或解密密码，请重新填写并保存。')
         from campusconnect.ui_layout import build
         build(self)
+        if IS_MAC:
+            from AppKit import NSApplication, NSImage
+            app_icon = NSImage.alloc().initWithContentsOfFile_(str(asset_path('campus-icon.png')))
+            if app_icon is not None:
+                NSApplication.sharedApplication().setApplicationIconImage_(app_icon)
         icon = asset_path('campus.ico')
-        if icon.exists():
+        if not IS_MAC and icon.exists():
             root.iconbitmap(str(icon))
-        log_handler = QueueLog(self.events)
-        log_handler.setFormatter(logging.Formatter('%(asctime)s  %(message)s', datefmt='%H:%M:%S'))
         file_handler = TimedRotatingFileHandler(DATA / 'client.log', when='midnight',
                                                 backupCount=14, encoding='utf-8')
-        logging.basicConfig(level=logging.INFO, handlers=[log_handler, file_handler],
+        logging.basicConfig(level=logging.INFO, handlers=[file_handler],
                             format='%(asctime)s [主进程 %(process)d] %(message)s', force=True)
         logging.info('程序启动；版本=%s；打包运行=%s；启动方式=%s', VERSION,
                      bool(getattr(sys, 'frozen', False)), '开机启动' if '--startup' in sys.argv else '手动打开')
@@ -127,8 +102,12 @@ class App:
         except Exception:
             logging.info('托盘不可用，关闭按钮将最小化到任务栏。')
         root.protocol('WM_DELETE_WINDOW', self.on_window_close)
+        if IS_MAC:
+            root.createcommand('tk::mac::Quit', self.close)
+            root.createcommand('tk::mac::ReopenApplication', self.show)
         root.after(100, self.poll)
-        if self.auto_connect.get() and self.remember.get() and self.password.get():
+        if (self.auto_connect.get() and self.remember.get() and self.password.get()
+                and self.account.get().strip() and self.operator.get() in OPERATORS):
             root.after(500, self.start)
             logging.info('已安排启动后自动连接，延迟 0.5 秒')
             if '--startup' in sys.argv:
@@ -155,8 +134,6 @@ class App:
 
     def save(self):
         try:
-            if self.auto_connect.get():
-                build_login_url(self.account.get(), self.password.get(), self.operator.get())
             # Apply startup only when the user saves or clicks Connect.
             previous_startup = startup_enabled()
             set_startup(self.autostart.get())
@@ -175,14 +152,17 @@ class App:
             messagebox.showerror('无法保存', str(exc) if isinstance(exc, ValueError) else '设置保存失败，请检查本地文件和启动项权限。')
             return False
         self.saved_close_action = self.close_action.get()
-        self.state.set('设置已保存。')
+        if self.running:
+            self.worker.set_auto(self.auto.get())
+        else:
+            self.state.set('设置已保存。')
         logging.info('设置已保存；记住密码=%s；开机启动=%s；自动连接=%s；持续监测=%s',
                      self.remember.get(), self.autostart.get(), self.auto_connect.get(), self.auto.get())
         return True
 
     def open_logs(self):
         try:
-            os.startfile(str(DATA))
+            open_directory(DATA)
         except OSError:
             messagebox.showerror('打开日志失败', f'请手动打开日志目录：{DATA}')
 
@@ -216,10 +196,6 @@ class App:
         for widget in self.inputs:
             widget.configure(state='disabled' if running else 'normal')
         self.select.configure(state='disabled' if running else 'readonly')
-        for checkbox in self.option_boxes:
-            checkbox.configure(state='disabled' if running else 'normal')
-        self.close_select.configure(state='disabled' if running else 'normal')
-        self.save_button.configure(state='disabled' if running else 'normal')
         self.start_button.configure(state='disabled' if running else 'normal')
         self.stop_button.configure(state='normal' if running else 'disabled')
 
@@ -256,14 +232,7 @@ class App:
                 kind, value = self.events.get_nowait()
             except queue.Empty:
                 break
-            if kind == 'log':
-                self.log.configure(state='normal')
-                self.log.insert('end', value + '\n')
-                if int(self.log.index('end-1c').split('.')[0]) > 250:
-                    self.log.delete('1.0', '50.0')
-                self.log.see('end')
-                self.log.configure(state='disabled')
-            elif kind == 'show':
+            if kind == 'show':
                 self.show()
             elif kind == 'settings':
                 self.show()

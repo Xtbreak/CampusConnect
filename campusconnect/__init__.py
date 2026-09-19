@@ -1,1 +1,1 @@
-"""CampusConnect Windows campus network client."""
+"""CampusConnect Windows and macOS campus network client."""

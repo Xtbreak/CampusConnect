@@ -1,6 +1,7 @@
 from campusconnect.paths import asset_path
 """Tray callbacks communicate through a queue; only Tk's thread touches widgets."""
 import threading
+import sys
 from pathlib import Path
 
 import pystray
@@ -32,15 +33,21 @@ class Tray:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem('退出程序', lambda *_: events.put(('exit', ''))),
         ))
-        self.thread = threading.Thread(target=self.run, daemon=True)
-        self.thread.start()
+        if sys.platform == 'darwin':
+            # Cocoa must share Tk's main-thread event loop.
+            self.icon.run_detached(setup=lambda icon: None)
+            self.setup(self.icon)
+        else:
+            self.thread = threading.Thread(target=self.run, daemon=True)
+            self.thread.start()
+
+    def setup(self, icon):
+        icon.visible = True
+        self.ready.set()
 
     def run(self):
-        def setup(icon):
-            icon.visible = True
-            self.ready.set()
         try:
-            self.icon.run(setup=setup)
+            self.icon.run(setup=self.setup)
         except Exception:
             self.events.put(('tray_error', ''))
         finally:
@@ -48,3 +55,4 @@ class Tray:
 
     def stop(self):
         self.icon.stop()
+        self.ready.clear()
