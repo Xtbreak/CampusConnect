@@ -1,0 +1,17 @@
+__pycache__/
+*.py[cod]
+.venv/
+.venv-build/
+build/
+dist/
+*.spec
+credentials.json
+config.json
+AutoConnect.lock
+logs/
+preferences.json
+*.log
+*.log.*
+.env
+.env.*
+!.env.example

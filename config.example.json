@@ -1,0 +1,4 @@
+{
+  "login_url_template": "http://10.255.0.19/drcom/login?callback=dr1003&DDDDD={account}%40aust&upass={token}&0MKKey=123456&R1=0&R3=0&R6=0&para=00&v6ip=&v=8187",
+  "credentials_file": "credentials.json"
+}

@@ -1,0 +1,4 @@
+requests>=2.31,<3
+pystray>=0.19,<1
+Pillow>=10,<13
+customtkinter>=5.2,<6
