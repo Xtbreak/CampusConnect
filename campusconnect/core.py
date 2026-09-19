@@ -15,7 +15,7 @@ import msvcrt
 from logging.handlers import TimedRotatingFileHandler
 
 import requests
-from diagnostics import measured_get, reply_metadata
+from campusconnect.diagnostics import measured_get, reply_metadata
 
 # 仅保留兼容旧版脚本的占位变量；真实账号和 Token 存放在被 .gitignore 忽略的
 # credentials.json 中，由 config.json 的模板在运行时拼接。
@@ -70,7 +70,7 @@ def load_login_url(path):
             raise ValueError('配置缺少 login_url_template')
         credential_path = path.parent / str(config.get('credentials_file', 'credentials.json'))
         if not credential_path.exists():
-            raise ValueError('未找到本地凭据文件，请先运行 setup.py')
+            raise ValueError('未找到本地凭据文件，请先运行 python -m scripts.configure_cli')
         credentials = json.loads(credential_path.read_text(encoding='utf-8-sig'))
         account = str(credentials.get('account', '')).strip()
         token = str(credentials.get('token', '')).strip()
@@ -336,7 +336,7 @@ def monitor(session, login_url, interval, daily):
 
 def main():
     parser = argparse.ArgumentParser(description='校园网监测、登录与注销重连；默认每分钟检查。')
-    parser.add_argument('--config', default=str(Path(__file__).resolve().with_name('config.json')))
+    parser.add_argument('--config', default=str(Path(__file__).resolve().parents[1] / 'config.json'))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--check-only', action='store_true', help='只查询，不改变连接')
     mode.add_argument('--login-once', action='store_true', help='尝试登录并验证一次')
@@ -346,7 +346,7 @@ def main():
     args = parser.parse_args()
     if args.interval < 30:
         parser.error('检查间隔至少 30 秒')
-    root = Path(__file__).resolve().parent
+    root = Path(args.config).resolve().parent
     try:
         # 查询也使用同一个锁，防止另一实例重连期间读取中间状态。
         with OperationLock(root / 'AutoConnect.lock'):

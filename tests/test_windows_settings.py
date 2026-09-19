@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-import windows_settings as settings
+from campusconnect import windows_settings as settings
 
 
 class SettingsTests(unittest.TestCase):

@@ -5,8 +5,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import AutoConnect as core
-import connection_worker as worker
+from campusconnect import core
+from campusconnect import connection_worker as worker
 
 
 def blocked_worker(credentials, auto, data_dir, events, stop):

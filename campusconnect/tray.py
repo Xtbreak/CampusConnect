@@ -1,3 +1,4 @@
+from campusconnect.paths import asset_path
 """Tray callbacks communicate through a queue; only Tk's thread touches widgets."""
 import threading
 from pathlib import Path
@@ -7,7 +8,7 @@ from PIL import Image, ImageDraw
 
 
 def icon_image():
-    source = Path(__file__).resolve().parent / 'assets' / 'campus-icon.png'
+    source = asset_path('campus-icon.png')
     if source.exists():
         with Image.open(source) as image:
             return image.convert('RGBA').resize((64, 64), Image.Resampling.LANCZOS)

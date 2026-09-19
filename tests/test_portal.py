@@ -1,6 +1,6 @@
 import unittest
 from urllib.parse import urlsplit, parse_qs
-from portal import build_login_url
+from campusconnect.portal import build_login_url
 
 
 class LoginParametersTest(unittest.TestCase):

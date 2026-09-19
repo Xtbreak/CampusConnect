@@ -6,7 +6,7 @@ import tkinter as tk
 import unittest
 from unittest.mock import MagicMock, patch
 
-import desktop
+from campusconnect import desktop
 
 
 class PanelLogTests(unittest.TestCase):

@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
     config_path = ROOT / 'config.json'
-    example = ROOT / 'config.example.json'
+    example = ROOT / 'config' / 'config.example.json'
     if not config_path.exists():
         config_path.write_text(example.read_text(encoding='utf-8'), encoding='utf-8')
         print('已从 config.example.json 创建 config.json；如学校地址不同，请先编辑它。')
@@ -25,7 +25,7 @@ def main():
         encoding='utf-8',
     )
     print(f'配置完成：{credentials_path}')
-    print('请确认 credentials.json 已被 .gitignore 忽略，然后运行：python AutoConnect.py --login-once')
+    print('请确认 credentials.json 已被 .gitignore 忽略，然后运行：python -m campusconnect.core --login-once')
 
 
 if __name__ == '__main__':

@@ -1,3 +1,4 @@
+from campusconnect.paths import asset_path
 """Connection dashboard and settings, with explicit switches rather than theme checkboxes."""
 import tkinter as tk
 from tkinter import ttk
@@ -18,7 +19,7 @@ def build(app):
     sidebar = ctk.CTkFrame(shell, width=180, corner_radius=0, fg_color='#101d35')
     sidebar.pack(side='left', fill='y')
     sidebar.pack_propagate(False)
-    with Image.open(Path(__file__).resolve().parent / 'assets' / 'campus-icon.png') as source:
+    with Image.open(asset_path('campus-icon.png')) as source:
         app.brand_image = ctk.CTkImage(light_image=source.copy(), dark_image=source.copy(), size=(68, 68))
     ctk.CTkLabel(sidebar, text='', image=app.brand_image).pack(pady=(26, 4))
     ctk.CTkLabel(sidebar, text='校园网助手', text_color='white',

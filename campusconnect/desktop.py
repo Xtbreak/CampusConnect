@@ -1,3 +1,4 @@
+from campusconnect.paths import asset_path
 """无需命令行的 Windows 校园网客户端。"""
 import json
 import logging
@@ -11,11 +12,11 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 from logging.handlers import TimedRotatingFileHandler
 
-from connection_worker import ConnectionTask
-from AutoConnect import VERSION
-from portal import OPERATORS, build_login_url
-from windows_settings import save_preferences, unprotect, set_startup, startup_enabled
-from tray import Tray
+from campusconnect.connection_worker import ConnectionTask
+from campusconnect.core import VERSION
+from campusconnect.portal import OPERATORS, build_login_url
+from campusconnect.windows_settings import save_preferences, unprotect, set_startup, startup_enabled
+from campusconnect.tray import Tray
 
 DATA = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'MyWatch'
 
@@ -104,9 +105,9 @@ class App:
         except (OSError, ValueError, AttributeError):
             self.auto_connect.set(False)
             self.state.set('未能读取设置或解密密码，请重新填写并保存。')
-        from ui_layout import build
+        from campusconnect.ui_layout import build
         build(self)
-        icon = Path(__file__).resolve().parent / 'assets' / 'campus.ico'
+        icon = asset_path('campus.ico')
         if icon.exists():
             root.iconbitmap(str(icon))
         log_handler = QueueLog(self.events)

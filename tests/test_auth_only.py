@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 import requests
-import AutoConnect as core
+from campusconnect import core
 
 
 class AuthOnlyTests(unittest.TestCase):

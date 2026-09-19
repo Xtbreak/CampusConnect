@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 import requests
-from diagnostics import error_category, measured_get, reply_metadata
+from campusconnect.diagnostics import error_category, measured_get, reply_metadata
 
 
 class DiagnosticsTests(unittest.TestCase):

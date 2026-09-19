@@ -5,8 +5,8 @@ import time
 from pathlib import Path
 
 import requests
-import AutoConnect as core
-from portal import build_login_url
+from campusconnect import core
+from campusconnect.portal import build_login_url
 
 
 class WorkerLog(logging.Handler):
