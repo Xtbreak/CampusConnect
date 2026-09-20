@@ -71,6 +71,13 @@ def build(app):
         pages[name] = ctk.CTkFrame(body, fg_color='transparent')
 
     home = pages['连接']
+    if not IS_MAC:
+        from campusconnect.mode_switch import ModeSwitch
+        app.mode_select = ModeSwitch(home, variable=app.connection_mode)
+        app.mode_select.pack(fill='x', padx=8, pady=(0, 6))
+    ctk.CTkLabel(home, text=('无线模式自动连接 AUST_Student，可能切换当前 Wi-Fi。' if not IS_MAC else
+                           '请先连接校园网络。'), text_color=MUTED,
+                 font=(FONT_FAMILY, 11)).pack(anchor='w', padx=12, pady=(0, 8))
     card = ctk.CTkFrame(home, fg_color=PANEL, corner_radius=16, border_width=1, border_color=LINE)
     card.pack(fill='x', padx=8)
     status = ctk.CTkFrame(card, fg_color=SOFT, corner_radius=12)
@@ -131,17 +138,17 @@ def build(app):
         switch = ctk.CTkSwitch(row, text='', variable=variable, width=54, switch_width=42, switch_height=23,
                                progress_color=PRIMARY, fg_color='#c9dced', button_color='#7399c2',
                                button_hover_color='#507fae', border_width=2)
-        switch.pack(side='right', padx=0, pady=17)
+        switch.pack(side='right', padx=0, pady=11)
         app.option_boxes.append(switch)
         text = ctk.CTkFrame(row, fg_color='transparent')
-        text.pack(fill='x', pady=10)
+        text.pack(fill='x', pady=6)
         ctk.CTkLabel(text, text=title, anchor='w', text_color=INK,
                      font=(FONT_FAMILY, 13, 'bold')).pack(fill='x')
         ctk.CTkLabel(text, text=note, anchor='w', text_color=MUTED,
                      font=(FONT_FAMILY, 11), wraplength=430, justify='left').pack(fill='x', pady=(3, 0))
 
     behavior = ctk.CTkFrame(settings, fg_color=PANEL, corner_radius=16, border_width=1, border_color=LINE)
-    behavior.pack(fill='x', padx=8, pady=14)
+    behavior.pack(fill='x', padx=8, pady=8)
     ctk.CTkLabel(behavior, text='关闭窗口时', anchor='w', text_color=INK,
                  font=(FONT_FAMILY, 13, 'bold')).pack(fill='x', padx=22, pady=(17, 5))
     ctk.CTkLabel(behavior, text='隐藏会继续后台连接；退出会停止任务并关闭程序。', anchor='w',
@@ -149,7 +156,7 @@ def build(app):
     app.close_select = ctk.CTkSegmentedButton(behavior, values=['隐藏到托盘', '彻底退出'], variable=app.close_action,
         height=42, selected_color=SOFT, selected_hover_color='#d6e9ff', unselected_color=PANEL,
         unselected_hover_color='#f0f6ff', fg_color=LINE, text_color=INK)
-    app.close_select.pack(fill='x', padx=22, pady=(12, 20))
+    app.close_select.pack(fill='x', padx=22, pady=(10, 12))
     app.save_button = ctk.CTkButton(settings, text='保存设置', height=44, corner_radius=10,
         fg_color=PRIMARY, hover_color=PRIMARY_HOVER, font=(FONT_FAMILY, 13, 'bold'), command=app.save)
     app.save_button.pack(anchor='w', padx=8, pady=(8, 0))

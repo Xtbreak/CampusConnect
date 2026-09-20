@@ -24,7 +24,7 @@ from campusconnect.diagnostics import measured_get, reply_metadata
 # credentials.json 中，由 config.json 的模板在运行时拼接。
 login_url = 'http://10.255.0.19/drcom/login?callback=dr1003&DDDDD=YOUR_ACCOUNT&upass=YOUR_TOKEN&0MKKey=123456&R1=0&R3=0&R6=0&para=00&v6ip=&v=8187'
 
-VERSION = '2026-09-19.2'
+VERSION = '2026-09-20.4'
 
 
 def print(*args, **kwargs):
@@ -142,7 +142,7 @@ def status(session, login_url):
         return None, {}
 
 
-def cycle(session, login_url, permit_login, force_login=False, verify_internet=True):
+def cycle(session, login_url, permit_login, force_login=False, verify_internet=True, login_guard=None):
     print(f'[连接检查] 允许登录={permit_login}；强制登录={force_login}；外网检测={verify_internet}')
     if not force_login:
         online, _ = status(session, login_url)
@@ -165,6 +165,9 @@ def cycle(session, login_url, permit_login, force_login=False, verify_internet=T
         if online is None:
             print('认证服务器状态未知，本轮不发送登录或注销请求。')
             return False
+    if login_guard is not None and not login_guard():
+        print('网络环境已变化或任务已停止，本轮不发送登录请求。')
+        return False
     print('发送登录请求……')
     try:
         with measured_get(session, '校园网登录 /drcom/login', login_url,

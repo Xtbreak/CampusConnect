@@ -22,6 +22,7 @@ class DesktopTests(unittest.TestCase):
             try:
                 self.assertTrue(all(option.get() for option in
                                     (app.auto, app.remember, app.autostart, app.auto_connect)))
+                self.assertFalse(app.wifi_auto.get())
                 app.auto_connect.set(True)
                 app.remember.set(True)
                 with patch.object(desktop, 'build_login_url') as validate:
@@ -57,6 +58,7 @@ class DesktopTests(unittest.TestCase):
             app = desktop.App(root)
             root.update()
             app.close_action.set('彻底退出')
+            app.connection_mode.set('有线连接' if desktop.IS_MAC else '无线连接')
             self.assertTrue(app.save())
             with patch.object(app, 'close') as quit_app, patch.object(app, 'hide') as hide:
                 app.on_window_close()
@@ -68,6 +70,7 @@ class DesktopTests(unittest.TestCase):
             app = desktop.App(root)
             root.update()
             self.assertEqual(app.saved_close_action, '彻底退出')
+            self.assertEqual(app.wifi_auto.get(), not desktop.IS_MAC)
             app.close_action.set('隐藏到托盘')
             self.assertTrue(app.save())
             with patch.object(app, 'hide') as hide:
@@ -100,11 +103,22 @@ class DesktopTests(unittest.TestCase):
             switch.toggle()
             self.assertNotEqual(app.auto.get(), original)
             app.set_running(True)
+            if not desktop.IS_MAC:
+                self.assertEqual(app.mode_select.cget('state'), 'disabled')
+                before = app.connection_mode.get()
+                app.mode_select.select(1)
+                self.assertEqual(app.connection_mode.get(), before)
             self.assertEqual(switch.cget('state'), 'normal')
             self.assertEqual(app.save_button.cget('state'), 'normal')
             self.assertTrue(all(w.cget('state') == 'disabled' for w in app.inputs))
             self.assertTrue(all(button.cget('state') == 'normal' for button in app.close_select._buttons_dict.values()))
             app.set_running(False)
+            if not desktop.IS_MAC:
+                self.assertEqual(app.mode_select.cget('state'), 'normal')
+                app.mode_select.select(1)
+                self.assertEqual(app.connection_mode.get(), '无线连接')
+                app.mode_select.select(0)
+                self.assertEqual(app.connection_mode.get(), '有线连接')
             self.assertTrue(all(button.cget('state') == 'normal' for button in app.close_select._buttons_dict.values()))
             self.assertLessEqual(app.save_button.winfo_rooty() + app.save_button.winfo_height(),
                                  root.winfo_rooty() + root.winfo_height())
@@ -128,9 +142,11 @@ class DesktopTests(unittest.TestCase):
                 app.set_running(True)
                 app.state.set('网络已连接。')
                 app.auto.set(False)
+                app.connection_mode.set('有线连接' if desktop.IS_MAC else '无线连接')
                 app.close_action.set('彻底退出')
                 self.assertTrue(app.save())
                 task.set_auto.assert_called_once_with(False)
+                task.set_wifi_auto.assert_called_once_with(not desktop.IS_MAC)
                 task.stop.assert_not_called()
                 task.start.assert_not_called()
                 self.assertEqual(app.state.get(), '网络已连接。')

@@ -8,20 +8,23 @@ from unittest.mock import patch, MagicMock
 
 from campusconnect import core
 from campusconnect import connection_worker as worker
+from campusconnect.network import Network
 
 
-def blocked_worker(credentials, auto, data_dir, events, stop):
+def blocked_worker(credentials, auto, data_dir, events, stop, wifi_auto=False, mode='auto'):
     def blocked_cycle(*args, **kwargs):
         events.put(('ready', ''))
         time.sleep(60)  # Simulates a socket/DNS operation ignoring cancellation.
         (Path(data_dir) / 'unexpected-request').touch()
         return False
-    with patch.object(core, 'cycle', side_effect=blocked_cycle):
+    with patch.object(core, 'cycle', side_effect=blocked_cycle), \
+         patch.object(worker, 'snapshot', return_value=Network(kind='wired')):
         worker.run_connections(credentials, auto, data_dir, events, stop)
 
 
-def online_worker(credentials, auto, data_dir, events, stop):
+def online_worker(credentials, auto, data_dir, events, stop, wifi_auto=False, mode='auto'):
     with patch.object(core, 'cycle', return_value=True), \
+         patch.object(worker, 'snapshot', return_value=Network(kind='wired')), \
          patch.object(core, 'connected', return_value=True):
         worker.run_connections(credentials, auto, data_dir, events, stop)
 
@@ -74,6 +77,7 @@ class CancellationTests(unittest.TestCase):
         for authenticated, internet in [(True, True), (True, False), (False, True), (False, False)]:
             with self.subTest(authenticated=authenticated, internet=internet), \
                  tempfile.TemporaryDirectory() as folder, \
+                 patch.object(worker, 'snapshot', return_value=Network(kind='wired')), \
                  patch.object(core, 'cycle', return_value=authenticated) as cycle, \
                  patch.object(core, 'connected', return_value=internet) as probe:
                 events = queue.Queue()

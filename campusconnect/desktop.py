@@ -54,6 +54,8 @@ class App:
         self.remember = tk.BooleanVar(value=True)
         self.autostart = tk.BooleanVar(value=True)
         self.auto_connect = tk.BooleanVar(value=True)
+        self.wifi_auto = tk.BooleanVar(value=False)
+        self.connection_mode = tk.StringVar(value='有线连接')
         self.close_action = tk.StringVar(value='隐藏到托盘')
         self.saved_close_action = '隐藏到托盘'
         self.state = tk.StringVar(value='请填写校园网账号、密码并选择运营商。')
@@ -66,6 +68,7 @@ class App:
             self.auto.set(bool(settings.get('auto', True)))
             self.remember.set(bool(settings.get('remember', True)))
             self.auto_connect.set(bool(settings.get('auto_connect', True)))
+            self.wifi_auto.set(bool(settings.get('wifi_auto', False)) and not IS_MAC)
             self.saved_close_action = settings.get('close_action', '隐藏到托盘')
             if self.saved_close_action not in ('隐藏到托盘', '彻底退出'):
                 self.saved_close_action = '隐藏到托盘'
@@ -78,6 +81,7 @@ class App:
             self.auto_connect.set(False)
             self.state.set('未能读取设置或解密密码，请重新填写并保存。')
         from campusconnect.ui_layout import build
+        self.connection_mode.set('无线连接' if self.wifi_auto.get() else '有线连接')
         build(self)
         if IS_MAC:
             from AppKit import NSApplication, NSImage
@@ -133,6 +137,7 @@ class App:
 
 
     def save(self):
+        self.wifi_auto.set(self.connection_mode.get() == '无线连接' and not IS_MAC)
         try:
             # Apply startup only when the user saves or clicks Connect.
             previous_startup = startup_enabled()
@@ -142,6 +147,7 @@ class App:
                     'account': self.account.get().strip(), 'operator': self.operator.get(),
                     'remember': self.remember.get(), 'auto_connect': self.auto_connect.get(),
                     'auto': self.auto.get(), 'close_action': self.close_action.get(),
+                    'wifi_auto': self.wifi_auto.get() and not IS_MAC,
                 }, self.password.get())
             except (OSError, ValueError):
                 if previous_startup != self.autostart.get():
@@ -154,6 +160,7 @@ class App:
         self.saved_close_action = self.close_action.get()
         if self.running:
             self.worker.set_auto(self.auto.get())
+            self.worker.set_wifi_auto(self.wifi_auto.get() and not IS_MAC)
         else:
             self.state.set('设置已保存。')
         logging.info('设置已保存；记住密码=%s；开机启动=%s；自动连接=%s；持续监测=%s',
@@ -184,7 +191,8 @@ class App:
         credentials = (self.account.get(), self.password.get(), self.operator.get())
         try:
             logging.info('准备启动独立网络任务')
-            self.worker.start(credentials, self.auto.get(), DATA)
+            mode = 'auto' if IS_MAC else ('wifi' if self.wifi_auto.get() else 'wired')
+            self.worker.start(credentials, self.auto.get(), DATA, self.wifi_auto.get() and not IS_MAC, mode)
             logging.info('网络子进程已创建；PID=%s', self.worker.process.pid)
         except (OSError, RuntimeError):
             logging.info('创建网络子进程失败')
@@ -193,6 +201,8 @@ class App:
             self.state.set('无法启动连接任务，请关闭后重新打开程序。')
 
     def set_running(self, running):
+        if hasattr(self, 'mode_select'):
+            self.mode_select.configure(state='disabled' if running else 'normal')
         for widget in self.inputs:
             widget.configure(state='disabled' if running else 'normal')
         self.select.configure(state='disabled' if running else 'readonly')

@@ -1,4 +1,4 @@
-"""安徽理工大学有线门户参数；来源见 README。"""
+"""安徽理工大学有线与 AUST_Student 门户参数；来源见 docs/usage.md。"""
 import time
 from urllib.parse import urlencode
 
